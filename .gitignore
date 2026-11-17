@@ -1,0 +1,20 @@
+# secrets
+.env
+
+# data & outputs
+data/
+logs/
+artifacts/
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# node / dashboard
+node_modules/
+.next/
+
+# mac
+.DS_Store
