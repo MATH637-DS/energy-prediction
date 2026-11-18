@@ -17,7 +17,7 @@ To do so, we rely on historical data from the provided API:
 We use a collection of different learning methods to make our predicitons
 
 ## Project Setup
-
+This project uses Python >=3.12
 1. **Clone the repository**
 ```bash
 git clone https://github.com/jhcooper/energy-prediction.git
@@ -32,7 +32,7 @@ git clone https://github.com/jhcooper/energy-prediction.git
 
 3. **Sync Project**
 ```bash
-cd energy-predicton 
+cd energy-prediction 
 uv sync
 ```
 
@@ -41,11 +41,11 @@ uv sync
 UV is a useful all-in-one tool that's used to manage python projects. It provides package installation, dependency version control, and virtual environment managemnet in a single package thats very quick and easy to use. 
 
 #### 1. Adding Dependencies
-To install a new library(s) in the project, you use 'uv add', i.e.
+To install a new library(s) in the project, you use `uv add`, i.e.
  ```bash
  uv add pandas numpy scikit-learn
 ```
-uv will automatically resolve version conflicts and add all dependencies to [pyproject.toml](pyproject.toml) to make sure that all team members have exactly the same versions.
+uv will automatically resolve version conflicts and add all dependencies to [uv.lock](uv.lock) to make sure that all team members have exactly the same versions.
 #### 2. Syncing After A Pull
 uv does this automatically when using `uv run`, but it doesnt hurt to do at the beginning of a session since it only takes seconds. running `uv sync` after pulling, i.e.
 ```bash
@@ -61,6 +61,20 @@ uv run path-to-file.py
 ```
 
 ## Connecting to the API
-
-
-### This Project Uses Python Version >=3.12
+To connect to the API you need to create a .env file and add the API key from email. You can do so by copying .env.example
+```bash
+cp .env.example .env
+nano .env
+```
+or just create the file yourself, and add/replace
+```text
+API_KEY=YOUR_API_KEY
+```
+## Repository Structutre
+  1. **/artifacts:** for saved models once we start training
+  2. **/backend:** for any API interaction scripts, **/collection** for pulling **/submission** for result submision
+  3. **/dashboard:** frontend components for the live dashboard
+  4. **/data:** route data pulled from the api here. going to create subdirectories for weather/power/forecast
+  5. **/documentation:** api guide, project description, etc.
+  6. **/logs:** route error logs etc.
+  7. **/report:** stuff for the final report.

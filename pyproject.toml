@@ -7,7 +7,9 @@ authors = [
     { name = "jhcooper", email = "122650638+jhcooper@users.noreply.github.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "python-dotenv>=1.2.4",
+]
 
 [project.scripts]
 energy-prediction = "energy_prediction:main"
