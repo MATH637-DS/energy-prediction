@@ -1,20 +1,21 @@
 # secrets
 .env
+.env.*
+!.env.example
 
 # data & outputs
-data/
-logs/
-artifacts/
+data/*
+!data/.gitkeep
+artifacts/*
+!artifacts/.gitkeep
+logs/*
+!logs/.gitkeep
 
 # python
 .venv/
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
-
-# node / dashboard
-node_modules/
-.next/
-
-# mac
-.DS_Store
+.pytest_cache/
+.ruff_cache/
+dist/
