@@ -1,0 +1,34 @@
+{
+  "buildings": [
+    {
+      "id": "classroom",
+      "name": "Classroom Building",
+      "type": "academic",
+      "area_m2": 9000
+    },
+    {
+      "id": "residence",
+      "name": "Residence Hall",
+      "type": "residential",
+      "area_m2": 13000
+    },
+    {
+      "id": "laboratory",
+      "name": "Research Laboratory",
+      "type": "research",
+      "area_m2": 6500
+    },
+    {
+      "id": "recreation",
+      "name": "Recreation Center",
+      "type": "recreation",
+      "area_m2": 8000
+    },
+    {
+      "id": "library",
+      "name": "Library",
+      "type": "library",
+      "area_m2": 11000
+    }
+  ]
+}

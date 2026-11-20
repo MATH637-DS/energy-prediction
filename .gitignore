@@ -4,8 +4,6 @@
 !.env.example
 
 # data & outputs
-data/*
-!data/.gitkeep
 artifacts/*
 !artifacts/.gitkeep
 logs/*
