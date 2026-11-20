@@ -1,4 +1,7 @@
 
+# To run:
+# uv run python src/training/prepare_data.py --lookback-hours 24 --horizon-hours 24
+
 import argparse
 import json
 from pathlib import Path
@@ -19,7 +22,6 @@ BUILDINGS = [
 ]
 
 INTERVAL = pd.Timedelta(minutes=15)
-HORIZON = pd.Timedelta(hours=6)
 SUBMISSION_OFFSET = pd.Timedelta(minutes=5)
 
 DEMAND_COLUMNS = [f"demand_kw.{b}" for b in BUILDINGS]
@@ -76,11 +78,21 @@ def load_observations(path):
     return df.set_index("timestamp").sort_index()
 
 
-def build_training_data(df, lookback_hours):
+def build_training_data(
+    df,
+    lookback_hours,
+    horizon_hours=6
+):
+    # Validate lookback and prediction horizon
     if lookback_hours < 1:
         raise ValueError("Lookback must be at least one hour")
 
+    if horizon_hours not in [6, 24]:
+        raise ValueError("Horizon must be 6 or 24 hours")
+
     lookback = pd.Timedelta(hours=lookback_hours)
+    horizon = pd.Timedelta(hours=horizon_hours)
+
     n_steps = lookback_hours * 4
 
     # Create input feature names for each historical reading
@@ -93,7 +105,7 @@ def build_training_data(df, lookback_hours):
     # Generate every possible forecast origin
     origins = pd.date_range(
         start=df.index.min() + lookback,
-        end=df.index.max() - HORIZON,
+        end=df.index.max() - horizon,
         freq=INTERVAL,
     )
 
@@ -103,7 +115,9 @@ def build_training_data(df, lookback_hours):
 
     for origin in origins:
         cutoff = origin - SUBMISSION_OFFSET
-        target_time = origin + HORIZON
+
+        # Determine the target using the selected horizon
+        target_time = origin + horizon
 
         # Construct the preceding historical window
         history_times = pd.date_range(
@@ -134,7 +148,7 @@ def build_training_data(df, lookback_hours):
             skipped_history += 1
             continue
 
-        # Locate the exact instantaneous six-hour target
+        # Locate the exact instantaneous target
         if target_time not in df.index:
             skipped_target += 1
             continue
@@ -176,7 +190,10 @@ def build_training_data(df, lookback_hours):
         records.append(record)
 
     # Display preprocessing statistics
-    print("Candidate windows:", len(origins))
+    print("Lookback hours:", lookback_hours)
+    print("Prediction horizon:", horizon_hours)
+
+    print("\nCandidate windows:", len(origins))
     print("Skipped due to input data:", skipped_history)
     print("Skipped due to target data:", skipped_target)
     print("Valid training packets:", len(records))
@@ -185,20 +202,29 @@ def build_training_data(df, lookback_hours):
 
     if not records:
         raise ValueError(
-            "No valid training packets for this lookback"
+            "No valid training packets for this lookback and horizon"
         )
 
     return pd.DataFrame(records)
 
 
 def main():
-    # Allow the lookback length to be specified in the terminal
+    # Allow lookback and horizon to be specified in the terminal
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
         "--lookback-hours",
         type=int,
         default=6,
+        help="Number of historical hours used as input",
+    )
+
+    parser.add_argument(
+        "--horizon-hours",
+        type=int,
+        choices=[6, 24],
+        default=6,
+        help="Number of hours into the future to predict",
     )
 
     args = parser.parse_args()
@@ -211,7 +237,8 @@ def main():
     # Generate sliding-window training packets
     training = build_training_data(
         df,
-        args.lookback_hours
+        args.lookback_hours,
+        args.horizon_hours,
     )
 
     # Create the training data output directory
@@ -220,7 +247,8 @@ def main():
 
     # Save the processed training dataset
     output_path = output_dir / (
-        f"lookback_{args.lookback_hours}h_horizon_6h.csv"
+        f"lookback_{args.lookback_hours}h"
+        f"_horizon_{args.horizon_hours}h.csv"
     )
 
     training.to_csv(output_path, index=False)

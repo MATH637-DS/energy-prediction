@@ -1,4 +1,7 @@
 
+# To run:
+# uv run python src/training/split_data.py --lookback-hours 24 --horizon-hours 24
+
 import argparse
 from pathlib import Path
 
@@ -16,9 +19,13 @@ TIME_COLUMNS = [
 ]
 
 
-def load_training_data(lookback_hours=24):
+def load_training_data(
+    lookback_hours=24,
+    horizon_hours=6
+):
     path = TRAINING_DIR / (
-        f"lookback_{lookback_hours}h_horizon_6h.csv"
+        f"lookback_{lookback_hours}h"
+        f"_horizon_{horizon_hours}h.csv"
     )
 
     df = pd.read_csv(path)
@@ -28,6 +35,16 @@ def load_training_data(lookback_hours=24):
         df[column] = pd.to_datetime(
             df[column], utc=True
         )
+
+    # Verify that targets match the prediction horizon
+    actual_horizon = (
+        df["target_time"] - df["origin_time"]
+    )
+
+    if not actual_horizon.eq(
+        pd.Timedelta(hours=horizon_hours)
+    ).all():
+        raise ValueError("Incorrect prediction horizon")
 
     # Sort chronologically
     return df.sort_values(
@@ -57,7 +74,7 @@ def split_data(df, train_ratio=0.8):
     ]["submission_time"]
 
     # Training: all eligible 15-minute windows
-    # whose targets are available before testing
+    # whose targets are available by the start of testing
     train = df[
         (df["submission_time"] < test_start)
         & (df["target_published_at"] <= test_start)
@@ -82,10 +99,17 @@ def get_xy(df):
     return X, y
 
 
-def save_splits(train, test, lookback_hours, overwrite=False):
-    # Create an output directory for this lookback
+def save_splits(
+    train,
+    test,
+    lookback_hours,
+    overwrite=False,
+    horizon_hours=6
+):
+    # Create an output directory for this configuration
     output_dir = TRAINING_DIR / (
-        f"lookback_{lookback_hours}h_horizon_6h"
+        f"lookback_{lookback_hours}h"
+        f"_horizon_{horizon_hours}h"
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -110,10 +134,14 @@ def save_splits(train, test, lookback_hours, overwrite=False):
     print("Saved testing dataset:", test_path)
 
 
-def load_saved_splits(lookback_hours=24):
+def load_saved_splits(
+    lookback_hours=24,
+    horizon_hours=6
+):
     # Load previously saved training and testing datasets
     output_dir = TRAINING_DIR / (
-        f"lookback_{lookback_hours}h_horizon_6h"
+        f"lookback_{lookback_hours}h"
+        f"_horizon_{horizon_hours}h"
     )
 
     train = pd.read_csv(output_dir / "train.csv")
@@ -139,6 +167,13 @@ def main():
     )
 
     parser.add_argument(
+        "--horizon-hours",
+        type=int,
+        choices=[6, 24],
+        default=6,
+    )
+
+    parser.add_argument(
         "--train-ratio",
         type=float,
         default=0.8,
@@ -151,8 +186,14 @@ def main():
 
     args = parser.parse_args()
 
+    if args.lookback_hours < 1:
+        raise ValueError("Lookback must be at least one hour")
+
     # Load the processed dataset
-    df = load_training_data(args.lookback_hours)
+    df = load_training_data(
+        args.lookback_hours,
+        args.horizon_hours,
+    )
 
     # Split chronologically
     train, test = split_data(
@@ -160,7 +201,10 @@ def main():
         args.train_ratio,
     )
 
-    print("Total available packets:", len(df))
+    print("Lookback hours:", args.lookback_hours)
+    print("Prediction horizon:", args.horizon_hours)
+    print("Training ratio:", args.train_ratio)
+    print("\nTotal available packets:", len(df))
 
     # Display statistics for both datasets
     for name, dataset in [
@@ -196,7 +240,8 @@ def main():
         train,
         test,
         args.lookback_hours,
-        args.overwrite,
+        overwrite=args.overwrite,
+        horizon_hours=args.horizon_hours,
     )
 
 

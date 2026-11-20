@@ -61,7 +61,8 @@ def main():
     # --------------------------------------
 
     train, test = load_saved_splits(
-        lookback_hours
+        lookback_hours,
+        horizon_hours=HORIZON_HOURS
     )
 
     X_train, y_train = get_xy(train)
@@ -89,6 +90,19 @@ def main():
         or list(y_train.columns) != list(y_test.columns)
     ):
         raise ValueError("Unexpected dataset structure")
+
+    # Verify that targets match the prediction horizon
+    for dataset in [train, test]:
+
+        actual_horizon = (
+            dataset["target_time"]
+            - dataset["origin_time"]
+        )
+
+        if not actual_horizon.eq(
+            pd.Timedelta(hours=HORIZON_HOURS)
+        ).all():
+            raise ValueError("Incorrect prediction horizon")
 
 
     # --------------------------------------
@@ -277,7 +291,8 @@ def main():
     )
 
     model_path = output_dir / (
-        f"linear_regression_6h_lookback_{lookback_hours}h.joblib"
+        f"linear_regression_{HORIZON_HOURS}h"
+        f"_lookback_{lookback_hours}h.joblib"
     )
 
     joblib.dump({
