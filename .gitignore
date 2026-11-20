@@ -3,9 +3,22 @@
 .env.*
 !.env.example
 
+# data
+data/*
+!data/.gitkeep
+!data/training/
+!data/training/**
+
+# trained models
 # data & outputs
 artifacts/*
 !artifacts/.gitkeep
+!artifacts/baseline/
+artifacts/baseline/*
+!artifacts/baseline/*.pt
+!artifacts/baseline/*.joblib
+
+# logs
 logs/*
 !logs/.gitkeep
 

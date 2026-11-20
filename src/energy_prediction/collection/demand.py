@@ -1,3 +1,4 @@
+
 import json
 import os
 import time
@@ -8,6 +9,22 @@ import httpx as hp
 from dotenv import load_dotenv
 from energy_prediction.config import DATA_DIR, ROOT
 
+
+# Endpoint path -> output file name
+ENDPOINTS = {
+    "/health": "health",
+    "/openapi.json": "openapi",
+    "/v1/status": "status",
+    "/v1/buildings": "buildings",
+    "/v1/observations": "observations",
+    "/v1/weather/current": "current",
+    "/v1/weather/forecast": "forecast",
+    "/v1/submissions": "submissions",
+    "/v1/scoreboard": "scoreboard",
+}
+
+
+def load_credentials() -> tuple[str | None, str | None]:
 OBS_FILE = DATA_DIR / "observations.jsonl"
 FORECAST_FILE = DATA_DIR / "weather_forecasts.jsonl"
 STATE_FILE = DATA_DIR / "collection_state.json"
@@ -134,8 +151,12 @@ def collect_forecasts(client, state):
 
 def main():
     api_key, base_url = load_credentials()
+
     if not api_key or not base_url:
-        raise SystemExit("API_KEY and API_BASE_URL must be set in .env")
+        raise SystemExit(
+            "API_KEY and API_BASE_URL must be set in .env"
+        )
+
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     state = load_state()
 
