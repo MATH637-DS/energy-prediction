@@ -10,6 +10,7 @@ data/*
 !data/training/**
 
 # trained models
+# data & outputs
 artifacts/*
 !artifacts/.gitkeep
 !artifacts/baseline/

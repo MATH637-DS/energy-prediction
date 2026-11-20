@@ -2,9 +2,11 @@
 import json
 import os
 import time
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Any
 import httpx as hp
 from dotenv import load_dotenv
-
 from energy_prediction.config import DATA_DIR, ROOT
 
 
@@ -23,56 +25,131 @@ ENDPOINTS = {
 
 
 def load_credentials() -> tuple[str | None, str | None]:
+OBS_FILE = DATA_DIR / "observations.jsonl"
+FORECAST_FILE = DATA_DIR / "weather_forecasts.jsonl"
+STATE_FILE = DATA_DIR / "collection_state.json"
+PAGE_LIMIT = 96
+REQUEST_SPACING = 2.1
+MAX_RETRIES = 5
+
+
+def load_credentials():
+    """
+    Returns api key and url as strings
+    """
     load_dotenv(ROOT / ".env")
-    return os.getenv("API_KEY"), os.getenv("API_BASE_URL")
+    key = os.getenv("API_KEY")
+    url = os.getenv("API_BASE_URL")
+    return key, url
 
 
-def get_all_observations(client: hp.Client) -> dict:
-    observations = []
-    cursor = 0
+def load_state() -> dict[str, Any]:
+    """
+    FOR ASYNCH RUN
+    returns cursor, final timestamp, and last forecast as of value
+    of the final observation of the last batch (for live run)
+    """
+    if STATE_FILE.exists():
+        return json.loads(STATE_FILE.read_text())
+    return {"cursor": 0, "first_timestamp": None, "last_forecast_as_of": None}
 
-    while True:
-        response = client.get(
-            "/v1/observations",
-            params={"after": cursor, "limit": 96}
-        )
 
-        # Handle API rate limits
-        if response.status_code == 429:
-            wait = int(response.headers.get("Retry-After", 60))
-            print(f"Rate limit reached. Waiting {wait} seconds.")
+def save_state(state):
+    """
+    FOR ASYNCH RUN
+    saves the cursor, final timestamp and last forcast as of value of the
+    final observation in the batch 
+    """
+    STATE_FILE.write_text(json.dumps(state))
+
+
+def append_jsonl(path, obs):
+    """
+    Appends a batch of observations to the
+    each row in rows is one observation
+    """
+    with open(path, "a", encoding="utf-8") as f:
+        for ob in obs:
+            f.write(json.dumps(ob) + "\n")
+
+
+def get(client, path, params = None):
+    """webfetch with rate-limit pacing and retries on network errors."""
+    for attempt in range(MAX_RETRIES):
+        time.sleep(REQUEST_SPACING)  # avoids over requesting
+        try:
+            r = client.get(path, params=params)
+        except hp.TransportError as e:
+            print(f"network error on {path}: {e}; retrying")
+            time.sleep(2**attempt)
+            continue
+        if r.status_code == 429:
+            wait = int(r.headers.get("Retry-After", 60))
+            print("429 rate limited")
             time.sleep(wait)
             continue
+        if r.status_code >= 500:
+            time.sleep(2**attempt)
+            continue
+        return r
+    raise RuntimeError(f"giving up on {path} after {MAX_RETRIES} attempts")
 
-        response.raise_for_status()
-        page = response.json()
 
-        observations.extend(page["data"])
+def collect_observations(client, state):
 
-        print(f"Retrieved {len(observations)} observations")
-
-        # Stop when all available observations have been retrieved
+    total = 0
+    while True:
+        request = get(
+            client, "/v1/observations", {"after": state["cursor"], "limit": PAGE_LIMIT}
+        )
+        request.raise_for_status()
+        page = request.json()
+        rows = page["data"]
+        if rows:
+            append_jsonl(OBS_FILE, rows)
+            state["first_timestamp"] = state["first_timestamp"] or rows[0]["timestamp"]
+            total += len(rows)
+        state["cursor"] = page["next_cursor"]
+        save_state(state)  # save after each page so an interruption loses nothing
         if not page["has_more"]:
             break
-
-        next_cursor = page["next_cursor"]
-
-        if next_cursor is None or next_cursor <= cursor:
-            raise ValueError("Pagination cursor did not advance")
-
-        cursor = next_cursor
-
-        # Respect the API request limit
-        time.sleep(2.1)
-
-    return {
-        "data": observations,
-        "next_cursor": page["next_cursor"],
-        "has_more": False
-    }
+    print(f"observations: +{total} rows, cursor={state['cursor']}")
 
 
-def main() -> None:
+def parse_ts(s):
+    """
+    datetime parser
+    """
+    return datetime.fromisoformat(s.replace("Z", "+00:00"))
+
+
+def collect_forecasts(client, state):
+    """Fetch the forecast available at each whole UTC hour since the first observation."""
+    if state["last_forecast_as_of"]:
+        as_of = parse_ts(state["last_forecast_as_of"]) + timedelta(hours=1)
+    elif state["first_timestamp"]:
+        as_of = parse_ts(state["first_timestamp"]).replace(
+            minute=0, second=0, microsecond=0
+        )
+    else:
+        return
+    now = datetime.now(UTC)
+    total = 0
+    while as_of <= now:
+        stamp = as_of.strftime("%Y-%m-%dT%H:%M:%SZ")
+        r = get(client, "/v1/weather/forecast", {"as_of": stamp})
+        if r.status_code == 200:
+            append_jsonl(FORECAST_FILE, [r.json()])
+            total += 1
+        elif r.status_code != 404:  # 404 = no forecast collected yet at that time
+            r.raise_for_status()
+        state["last_forecast_as_of"] = stamp
+        save_state(state)
+        as_of += timedelta(hours=1)
+    print(f"weather forecasts: +{total} snapshots")
+
+
+def main():
     api_key, base_url = load_credentials()
 
     if not api_key or not base_url:
@@ -81,36 +158,15 @@ def main() -> None:
         )
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    state = load_state()
 
     headers = {"Authorization": f"Bearer {api_key}"}
-
-    with hp.Client(
-        base_url=base_url,
-        headers=headers,
-        timeout=10
-    ) as client:
-
-        for endpoint, resource in ENDPOINTS.items():
-            try:
-                if endpoint == "/v1/observations":
-                    data = get_all_observations(client)
-                else:
-                    response = client.get(endpoint)
-                    print(f"{response.status_code} {endpoint}")
-                    response.raise_for_status()
-                    data = response.json()
-
-                with open(
-                    DATA_DIR / f"{resource}.json",
-                    "w",
-                    encoding="utf-8"
-                ) as f:
-                    json.dump(data, f, indent=4)
-
-                print(f"Saved {resource}.json")
-
-            except (hp.HTTPError, ValueError) as e:
-                print(f"Error in Retrieval of {resource}:", e)
+    with hp.Client(base_url=base_url, headers=headers, timeout=30) as client:
+        request = get(client, "/v1/buildings")
+        request.raise_for_status()
+        (DATA_DIR / "buildings.json").write_text(json.dumps(request.json(), indent=2))
+        collect_observations(client, state)
+        collect_forecasts(client, state)
 
 
 if __name__ == "__main__":
