@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Historical demand, model forecasts, forecast accuracy, and system status for University of Delaware buildings."
+    />
+    <title>Campus Energy Outlook</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Campus Energy Outlook home">
+        <span class="brand-mark" aria-hidden="true">E</span>
+        <span>ENERGY<span class="brand-light"> / OUTLOOK</span></span>
+      </a>
+      <div class="topbar-meta">
+        <span id="status-dot" class="live-dot" aria-hidden="true"></span>
+        <span>UNIVERSITY OF DELAWARE</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="intro">
+        <div>
+          <p class="eyebrow">MATH 637 · CAMPUS ENERGY</p>
+          <h1>Power Consumption Forecast<br /><span>University of Delaware</span></h1>
+          <p class="intro-copy">
+            <!-- Recent demand, what our models expect next, and how well they’re doing. -->
+          </p>
+        </div>
+        <div class="updated">
+          <span class="updated-label">DASHBOARD DATA</span>
+          <strong id="updated-at">Waiting for data</strong>
+        </div>
+      </section>
+
+      <section class="controls" aria-label="Dashboard filters">
+        <label>
+          <span>BUILDING</span>
+          <select id="building-select">
+            <option value="classroom">Gore Hall · Classroom</option>
+            <option value="residence">Brown Hall · Residence</option>
+            <option value="laboratory">Building X · Laboratory</option>
+            <option value="recreation">Lil Bob Gym · Recreation</option>
+            <option value="library">Morris Library · Library</option>
+          </select>
+        </label>
+        <label>
+          <span>HISTORICAL RANGE</span>
+          <select id="history-range">
+            <option value="24">Past 24 hours</option>
+            <option value="168">Past 7 days</option>
+            <option value="720">Past 30 days</option>
+            <option value="all">All available</option>
+          </select>
+        </label>
+        <label>
+          <span>FORECAST MODEL</span>
+          <select id="model-select" disabled>
+            <option value="">No model data</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="status-grid" aria-label="System status">
+        <article class="metric-card">
+          <span class="metric-label">LATEST COLLECTED READING</span>
+          <strong id="latest-reading">—</strong>
+          <span id="latest-reading-time" class="metric-note">No reading available</span>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">LATEST ACCEPTED SUBMISSION</span>
+          <strong id="latest-submission">—</strong>
+          <span id="latest-submission-time" class="metric-note">No accepted submission</span>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">NEXT SUBMISSION DEADLINE</span>
+          <strong id="next-deadline">—</strong>
+          <span id="deadline-note" class="metric-note">No deadline available</span>
+        </article>
+        <article class="metric-card system-health">
+          <span class="metric-label">RECENT SYSTEM ERRORS</span>
+          <strong id="error-count">—</strong>
+          <span id="error-summary" class="metric-note">Status not available</span>
+        </article>
+      </section>
+
+      <section id="errors-card" class="table-card errors-card" hidden>
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">COLLECTION & SUBMISSION</p>
+            <h2>Recent errors</h2>
+          </div>
+        </div>
+        <ul id="errors-list" class="errors-list"></ul>
+      </section>
+
+      <section class="chart-card" aria-labelledby="history-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">OBSERVED ELECTRICITY DEMAND</p>
+            <h2 id="history-title">Historical demand</h2>
+          </div>
+          <span class="unit-label">MEASURED · KILOWATTS</span>
+        </div>
+        <div class="chart-wrap">
+          <svg
+            id="history-chart"
+            class="forecast-chart"
+            viewBox="0 0 900 320"
+            role="img"
+            aria-label="Historical demand chart"
+            preserveAspectRatio="none"
+          ></svg>
+          <p id="history-empty" class="chart-empty" role="status">
+            Historical readings will appear here when data is published.
+          </p>
+        </div>
+      </section>
+
+      <section class="chart-card" aria-labelledby="forecast-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">MODEL OUTPUT · NOT YET API ACCEPTED</p>
+            <h2 id="forecast-title">Model forecasts</h2>
+          </div>
+          <span class="unit-label">PREDICTED · KILOWATTS</span>
+        </div>
+        <div class="forecast-toolbar">
+          <label for="forecast-horizon">
+            Forecast horizon
+            <output id="forecast-horizon-value" for="forecast-horizon">24 hours</output>
+          </label>
+          <input
+            id="forecast-horizon"
+            type="range"
+            min="1"
+            max="168"
+            step="1"
+            value="24"
+            aria-label="Forecast horizon from 1 hour to 1 week"
+          />
+          <div class="range-labels" aria-hidden="true">
+            <span>1 hour</span><span>1 week</span>
+          </div>
+        </div>
+        <p class="section-copy">
+          The line connects available 6- and 24-hour predictions; it does not
+          represent predictions for the hours between them.
+        </p>
+        <div class="chart-wrap">
+          <svg
+            id="forecast-chart"
+            class="forecast-chart"
+            viewBox="0 0 900 320"
+            role="img"
+            aria-label="Model forecast chart"
+            preserveAspectRatio="none"
+          ></svg>
+          <p id="forecast-empty" class="chart-empty" role="status">
+            No model predictions fall within this time window.
+          </p>
+        </div>
+        <div class="chart-legend">
+          <span class="legend-line" aria-hidden="true"></span>
+          <span>Model prediction</span>
+          <span class="legend-band" aria-hidden="true"></span>
+          <span>Prediction interval, when provided</span>
+        </div>
+      </section>
+
+      <section class="table-card" aria-labelledby="accepted-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">OFFICIAL SUBMISSIONS</p>
+            <h2 id="accepted-title">API-accepted forecasts</h2>
+          </div>
+          <span class="accepted-badge">ACCEPTED BY API</span>
+        </div>
+        <p class="section-copy">
+          Accepted 6-hour and 24-hour predictions, matched with actual demand when available.
+        </p>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">TARGET TIME (UTC)</th>
+                <th scope="col">HORIZON</th>
+                <th scope="col">MODEL VERSION</th>
+                <th scope="col">PREDICTED</th>
+                <th scope="col">ACTUAL</th>
+                <th scope="col">ABS. ERROR</th>
+              </tr>
+            </thead>
+            <tbody id="accepted-rows">
+              <tr><td colspan="6" class="empty-row">No accepted forecasts available.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="table-card" aria-labelledby="performance-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">RECENT EVALUATION</p>
+            <h2 id="performance-title">Forecast accuracy & coverage</h2>
+          </div>
+          <span id="evaluation-period" class="unit-label">PERIOD UNAVAILABLE</span>
+        </div>
+        <div class="metrics performance-metrics" aria-label="Overall recent performance">
+          <article class="metric-card">
+            <span class="metric-label">OVERALL MAE</span>
+            <strong id="overall-mae">—</strong>
+            <span class="metric-note">Mean absolute error · kW</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">OVERALL RMSE</span>
+            <strong id="overall-rmse">—</strong>
+            <span class="metric-note">Root mean squared error · kW</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">SUBMISSION COVERAGE</span>
+            <strong id="coverage">—</strong>
+            <span id="coverage-count" class="metric-note">No scored-prediction data</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">SCORED PREDICTIONS</span>
+            <strong id="scored-count">—</strong>
+            <span class="metric-note">Eligible targets with actual demand</span>
+          </article>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">BUILDING</th>
+                <th scope="col">HORIZON</th>
+                <th scope="col">MAE (kW)</th>
+                <th scope="col">RMSE (kW)</th>
+                <th scope="col">SCORED PREDICTIONS</th>
+              </tr>
+            </thead>
+            <tbody id="performance-rows">
+              <tr><td colspan="5" class="empty-row">Performance data will appear here.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>ENERGY PREDICTION PROJECT</span>
+      <span>Model forecasts are estimates. API-accepted forecasts are labeled separately.</span>
+    </footer>
+    <div id="page-error" class="page-error" role="alert" hidden></div>
+  </body>
+</html>
